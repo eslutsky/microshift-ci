@@ -11,7 +11,7 @@ ARG USHIFT_GITREF=spike-udn
 ARG OKD_VERSION_TAG
 
 # Internal variables
-ARG OKD_RELEASE_IMAGE_X86_64=quay.io/okd/scos-release
+ARG OKD_RELEASE_IMAGE_X86_64=quay.io/eslutsky/scos-release
 ARG OKD_RELEASE_IMAGE_AARCH64=ghcr.io/microshift-io/okd/okd-release-arm64
 ARG USHIFT_GIT_URL=https://github.com/eslutsky/microshift.git
 ENV HOME=/home/microshift
