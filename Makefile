@@ -30,7 +30,7 @@ EXPOSE_KUBEAPI_PORT ?= 1
 # Internal variables
 SHELL := /bin/bash
 # OKD release image URLs for different architectures
-OKD_RELEASE_IMAGE_X86_64 ?= quay.io/okd/scos-release
+OKD_RELEASE_IMAGE_X86_64 ?= quay.io/eslutsky/scos-release
 OKD_RELEASE_IMAGE_AARCH64 ?= ghcr.io/microshift-io/okd/okd-release-arm64
 
 RPM_IMAGE := microshift-okd-rpm
