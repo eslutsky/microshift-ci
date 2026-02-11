@@ -5,6 +5,7 @@ OWNER=${OWNER:-microshift-io}
 REPO=${REPO:-microshift}
 BRANCH=${BRANCH:-main}
 TAG=${TAG:-latest}
+NETWORK_DRIVER=${NETWORK_DRIVER:-kindnet}
 
 LVM_DISK="/var/lib/microshift-okd/lvmdisk.image"
 VG_NAME="myvg1"
@@ -85,6 +86,35 @@ function install_rpms() {
     dnf install -y 'greenboot-0.15.*'
 }
 
+function install_rpms_with_ovn_k() {
+    # Download the RPMs from the release
+    mkdir -p "${WORKDIR}/rpms"
+    curl -L -s --retry 5 \
+        "https://github.com/${OWNER}/${REPO}/releases/download/${TAG}/microshift-rpms-$(uname -m).tgz" | \
+        tar zxf - -C "${WORKDIR}/rpms"
+
+    # Download the installation scripts
+    for script in create_repos.sh postinstall.sh ; do
+        curl -fSsL --retry 5 --max-time 60 \
+            "https://github.com/${OWNER}/${REPO}/raw/${BRANCH}/src/rpm/${script}" \
+            -o "${WORKDIR}/${script}"
+        chmod +x "${WORKDIR}/${script}"
+    done
+
+    # Create the RPM repository and install the RPMs
+    "${WORKDIR}/create_repos.sh" -create "${WORKDIR}/rpms"
+    # Disable weak dependencies to avoid the deployment of the microshift-networking
+    # RPM, which is not necessary when microshift-kindnet RPM is installed.
+    dnf install -y  microshift microshift-topolvm
+    "${WORKDIR}/create_repos.sh" -delete
+
+    # Pin the greenboot package to 0.15.z until the following issue is resolved:
+    # https://github.com/fedora-iot/greenboot-rs/issues/132
+    dnf install -y 'greenboot-0.15.*'
+}
+
+
+
 function prepare_lvm_disk() {
     local -r lvm_disk="$1"
     local -r vg_name="$2"
@@ -136,7 +166,11 @@ fi
 # Run the procedures
 check_prerequisites
 centos10_cni_plugins
-install_rpms
+if [ "${NETWORK_DRIVER}" = "kindnet" ]; then
+    install_rpms
+else
+    install_rpms_with_ovn_k
+fi
 prepare_lvm_disk  "${LVM_DISK}" "${VG_NAME}"
 setup_lvm_service "${LVM_DISK}" "${VG_NAME}"
 start_microshift
