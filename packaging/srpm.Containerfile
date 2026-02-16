@@ -20,6 +20,7 @@ ARG USHIFT_BUILDRPMS_SCRIPT=/tmp/build-rpms.sh
 ARG USHIFT_MODIFY_SPEC_SCRIPT=/tmp/modify-spec.py
 ARG SPEC_KINDNET=/tmp/kindnet.spec
 ARG SPEC_TOPOLVM=/tmp/topolvm.spec
+ARG SPEC_MULTUS=/tmp/multus.spec
 
 # Verify mandatory build arguments
 RUN if [ -z "${OKD_VERSION_TAG}" ]; then \
@@ -60,11 +61,19 @@ COPY ./src/topolvm/release/ ./assets/optional/topolvm/
 RUN ARCH="x86_64" "${USHIFT_PREBUILD_SCRIPT}" --replace-kindnet "${OKD_RELEASE_IMAGE_X86_64}" "${OKD_VERSION_TAG}" && \
     ARCH="aarch64" "${USHIFT_PREBUILD_SCRIPT}" --replace-kindnet "${OKD_RELEASE_IMAGE_AARCH64}" "${OKD_VERSION_TAG}"
 
+COPY ./src/multus/multus.spec "${SPEC_MULTUS}"
+COPY ./src/multus/assets/ ./assets/optional/
+COPY ./src/multus/dropins/ ./packaging/microshift/dropins/
+COPY ./src/multus/crio.conf.d/ ./packaging/crio.conf.d/
+
+RUN ARCH="x86_64" "${USHIFT_PREBUILD_SCRIPT}" --replace-multus "${OKD_RELEASE_IMAGE_X86_64}" "${OKD_VERSION_TAG}" && \
+    ARCH="aarch64" "${USHIFT_PREBUILD_SCRIPT}" --replace-multus "${OKD_RELEASE_IMAGE_AARCH64}" "${OKD_VERSION_TAG}"
+
 COPY --chmod=755 ./src/image/modify-spec.py ${USHIFT_MODIFY_SPEC_SCRIPT}
 # Disable the RPM and SRPM checks in the make-rpm.sh script
 # and modify the microshift.spec to remove packages not yet supported by the upstream
 RUN sed -i -e 's,CHECK_RPMS="y",,g' -e 's,CHECK_SRPMS="y",,g' ./packaging/rpm/make-rpm.sh && \
-    "${USHIFT_MODIFY_SPEC_SCRIPT}" ./packaging/rpm/microshift.spec "${SPEC_KINDNET}" "${SPEC_TOPOLVM}"
+    "${USHIFT_MODIFY_SPEC_SCRIPT}" ./packaging/rpm/microshift.spec "${SPEC_KINDNET}" "${SPEC_TOPOLVM}" "${SPEC_MULTUS}"
 
 COPY --chmod=755 ./src/image/build-rpms.sh ${USHIFT_BUILDRPMS_SCRIPT}
 RUN "${USHIFT_BUILDRPMS_SCRIPT}" srpm

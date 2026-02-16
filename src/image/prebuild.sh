@@ -168,6 +168,40 @@ replace_kindnet_assets() {
     mv "${temp_json}" "${MICROSHIFT_ROOT}/assets/optional/kube-proxy/release-kube-proxy-${ARCH}.json"
 }
 
+replace_multus_assets() {
+    local -r okd_url=$1
+    local -r okd_releaseTag=$2
+    local -r temp_json="$(mktemp "/tmp/release-multus-${ARCH}.XXXXX.json")"
+
+    # Install the yq tool
+    "${MICROSHIFT_ROOT}"/scripts/fetch_tools.sh yq
+
+    # Multus images from OKD release: multus-cni-microshift and containernetworking-plugins-microshift
+    local -r multus_image=$(oc_release_info "${okd_url}" "${okd_releaseTag}" "multus-cni-microshift")
+    local -r plugins_image=$(oc_release_info "${okd_url}" "${okd_releaseTag}" "containernetworking-plugins-microshift")
+    echo "[${ARCH}] Replacing 'multus-cni-microshift' with '${multus_image}'"
+    echo "[${ARCH}] Replacing 'containernetworking-plugins-microshift' with '${plugins_image}'"
+
+    local -r multus_name="${multus_image%%@*}"
+    local -r multus_hash="${multus_image##*@}"
+    local -r plugins_name="${plugins_image%%@*}"
+    local -r plugins_hash="${plugins_image##*@}"
+
+    # Update kustomization.${ARCH}.yaml with newName and digest for both images
+    "${MICROSHIFT_ROOT}"/_output/bin/yq eval \
+        ".images[] |= select(.name == \"multus-cni-microshift\") |= (.newName = \"${multus_name}\" | .digest = \"${multus_hash}\")" \
+        -i "${MICROSHIFT_ROOT}/assets/optional/multus/kustomization.${ARCH}.yaml"
+    "${MICROSHIFT_ROOT}"/_output/bin/yq eval \
+        ".images[] |= select(.name == \"containernetworking-plugins-microshift\") |= (.newName = \"${plugins_name}\" | .digest = \"${plugins_hash}\")" \
+        -i "${MICROSHIFT_ROOT}/assets/optional/multus/kustomization.${ARCH}.yaml"
+
+    # Update release-multus-${ARCH}.json
+    jq --arg multus "$multus_image" --arg plugins "$plugins_image" \
+        '.images["multus-cni-microshift"] = $multus | .images["containernetworking-plugins-microshift"] = $plugins' \
+        "${MICROSHIFT_ROOT}/assets/optional/multus/release-multus-${ARCH}.json" >"${temp_json}"
+    mv "${temp_json}" "${MICROSHIFT_ROOT}/assets/optional/multus/release-multus-${ARCH}.json"
+}
+
 fix_rpm_spec() {
     # Fix the RPM spec by removing the microshift-networking package hard dependency
     sed -i 's/Requires: microshift-networking/Recommends: microshift-networking/' "${MICROSHIFT_ROOT}/packaging/rpm/microshift.spec"
@@ -178,6 +212,7 @@ usage() {
     echo "$(basename "$0") --verify          OKD_URL RELEASE_TAG    verify OKD upstream release"
     echo "$(basename "$0") --replace         OKD_URL RELEASE_TAG    replace MicroShift assets with OKD upstream images"
     echo "$(basename "$0") --replace-kindnet OKD_URL RELEASE_TAG    replace Kindnet assets with OKD upstream images"
+    echo "$(basename "$0") --replace-multus OKD_URL RELEASE_TAG    replace Multus assets with OKD upstream images"
     exit 1
 }
 
@@ -198,6 +233,10 @@ case "$1" in
 --replace-kindnet)
     verify_okd_release     "$2" "$3"
     replace_kindnet_assets "$2" "$3"
+    ;;
+--replace-multus)
+    verify_okd_release    "$2" "$3"
+    replace_multus_assets "$2" "$3"
     ;;
 --verify)
     verify_okd_release "$2" "$3"

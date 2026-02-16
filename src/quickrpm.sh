@@ -105,7 +105,7 @@ function install_rpms_with_ovn_k() {
     "${WORKDIR}/create_repos.sh" -create "${WORKDIR}/rpms"
     # Disable weak dependencies to avoid the deployment of the microshift-networking
     # RPM, which is not necessary when microshift-kindnet RPM is installed.
-    dnf install -y  microshift microshift-topolvm
+    dnf install -y  microshift microshift-topolvm microshift-multus
     "${WORKDIR}/create_repos.sh" -delete
 
     # Pin the greenboot package to 0.15.z until the following issue is resolved:
