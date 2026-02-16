@@ -21,6 +21,7 @@ ARG USHIFT_MODIFY_SPEC_SCRIPT=/tmp/modify-spec.py
 ARG SPEC_KINDNET=/tmp/kindnet.spec
 ARG SPEC_TOPOLVM=/tmp/topolvm.spec
 ARG SPEC_MULTUS=/tmp/multus.spec
+ARG SPEC_FRR_K8S=/tmp/frr-k8s.spec
 
 # Verify mandatory build arguments
 RUN if [ -z "${OKD_VERSION_TAG}" ]; then \
@@ -69,11 +70,15 @@ COPY ./src/multus/crio.conf.d/ ./packaging/crio.conf.d/
 RUN ARCH="x86_64" "${USHIFT_PREBUILD_SCRIPT}" --replace-multus "${OKD_RELEASE_IMAGE_X86_64}" "${OKD_VERSION_TAG}" && \
     ARCH="aarch64" "${USHIFT_PREBUILD_SCRIPT}" --replace-multus "${OKD_RELEASE_IMAGE_AARCH64}" "${OKD_VERSION_TAG}"
 
+COPY ./src/frr-k8s/frr-k8s.spec "${SPEC_FRR_K8S}"
+COPY ./src/frr-k8s/assets/ ./assets/optional/
+
 COPY --chmod=755 ./src/image/modify-spec.py ${USHIFT_MODIFY_SPEC_SCRIPT}
 # Disable the RPM and SRPM checks in the make-rpm.sh script
-# and modify the microshift.spec to remove packages not yet supported by the upstream
+# and modify the microshift.spec to remove packages not yet supported by the upstream.
+# make-rpm.sh builds the merged microshift.spec (including kindnet, topolvm, multus, frr-k8s).
 RUN sed -i -e 's,CHECK_RPMS="y",,g' -e 's,CHECK_SRPMS="y",,g' ./packaging/rpm/make-rpm.sh && \
-    "${USHIFT_MODIFY_SPEC_SCRIPT}" ./packaging/rpm/microshift.spec "${SPEC_KINDNET}" "${SPEC_TOPOLVM}" "${SPEC_MULTUS}"
+    "${USHIFT_MODIFY_SPEC_SCRIPT}" ./packaging/rpm/microshift.spec "${SPEC_KINDNET}" "${SPEC_TOPOLVM}" "${SPEC_MULTUS}" "${SPEC_FRR_K8S}"
 
 COPY --chmod=755 ./src/image/build-rpms.sh ${USHIFT_BUILDRPMS_SCRIPT}
 RUN "${USHIFT_BUILDRPMS_SCRIPT}" srpm
